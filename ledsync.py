@@ -1,4 +1,5 @@
 """LED Sync - controla e sincroniza todos os LEDs RGB via servidor SDK do OpenRGB."""
+# SPDX-License-Identifier: GPL-2.0-or-later
 import colorsys
 import json
 import math

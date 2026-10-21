@@ -38,3 +38,7 @@ Instala o OpenRGB e as dependências Python, e cria os atalhos na Área de Traba
 - Fechar a janela não para os LEDs; use **Encerrar** para parar o app.
 - Em "Addressable RGB Header", informe quantos LEDs estão ligados no conector ARGB.
 - `config.json` guarda efeito, cores, brilho e tamanhos das zonas.
+
+## Licença
+GPL-2.0-or-later — veja [LICENSE](LICENSE).
+O protocolo de LED da placa Galax (`galax_gpu.py`) é baseado no [OpenRGB](https://gitlab.com/CalcProgrammer1/OpenRGB), também GPL-2.0-or-later.
