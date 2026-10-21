@@ -1,0 +1,13 @@
+{
+  "effect": "audio_pulse",
+  "color": "#fb00ff",
+  "color2": "#ffffff",
+  "brightness": 100,
+  "speed": 10,
+  "disabled": [
+    "G703 LIGHTSPEED Wireless Gaming Mouse w/ HERO"
+  ],
+  "zone_sizes": {
+    "ASUS ROG STRIX B550-A GAMING|Addressable RGB Header 1": 30
+  }
+}

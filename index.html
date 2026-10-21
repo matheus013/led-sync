@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LED Sync</title>
+<style>
+  :root {
+    --bg: #0e0f13; --panel: #171920; --panel2: #1f222b; --line: #2a2e39;
+    --text: #e8eaf0; --muted: #8b90a0; --accent: #4cc2ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 20px 16px 40px; }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .logo { width: 38px; height: 38px; border-radius: 10px;
+          background: conic-gradient(from var(--h, 0deg), #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+          animation: spin 6s linear infinite; }
+  @property --h { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+  @keyframes spin { to { --h: 360deg; } }
+  h1 { margin: 0; font-size: 20px; font-weight: 600; }
+  #status { color: var(--muted); font-size: 12.5px; }
+  #status.ok::before { content: "● "; color: #3ddc84; }
+  .spacer { flex: 1; }
+  button { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line);
+           border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+            padding: 16px; margin-bottom: 14px; }
+  h2 { margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--muted);
+       text-transform: uppercase; letter-spacing: .06em; }
+  .effects { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+  .effects button { padding: 12px 8px; text-align: center; border-radius: 10px; }
+  .effects button.on { border-color: var(--accent); background: #12303f; }
+  .effects small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .row { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+  .field { display: flex; flex-direction: column; gap: 6px; min-width: 180px; flex: 1; }
+  .field label { color: var(--muted); font-size: 12.5px; display: flex; justify-content: space-between; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  input[type=color] { width: 54px; height: 36px; border: 1px solid var(--line); border-radius: 8px;
+                      background: var(--panel2); padding: 2px; cursor: pointer; }
+  .swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sw { width: 24px; height: 24px; border-radius: 6px; border: 1px solid #0006; cursor: pointer; padding: 0; }
+  .dev { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 10px;
+         background: var(--panel2); border: 1px solid var(--line); margin-bottom: 8px; }
+  .dev.off { opacity: .5; }
+  .devhead { display: flex; align-items: center; gap: 10px; }
+  .devhead b { font-weight: 600; }
+  .tag { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 1px 8px; }
+  .zone { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; margin-left: 4px; }
+  .zone input { width: 70px; background: var(--bg); color: var(--text); border: 1px solid var(--line);
+                border-radius: 6px; padding: 4px 6px; font: inherit; }
+  .hint { color: #f5b74a; font-size: 12px; }
+  .switch { position: relative; width: 40px; height: 22px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch span { position: absolute; inset: 0; background: #3a3f4c; border-radius: 99px; transition: .2s; cursor: pointer; }
+  .switch span::after { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px;
+                        border-radius: 50%; background: #fff; transition: .2s; }
+  .switch input:checked + span { background: var(--accent); }
+  .switch input:checked + span::after { transform: translateX(18px); }
+  #preview { height: 14px; border-radius: 99px; margin-top: 14px; border: 1px solid var(--line); }
+  .audio { display: flex; align-items: center; gap: 12px; margin-top: 12px; color: var(--muted); font-size: 12.5px; }
+  .audio[hidden] { display: none; }
+  .meter { flex: 1; height: 6px; background: var(--panel2); border-radius: 99px; overflow: hidden; }
+  .meter div { height: 100%; width: 0; background: linear-gradient(90deg, #3ddc84, #ffd000, #ff3b3b); transition: width .08s; }
+  @media (max-width: 560px) { .field { min-width: 100%; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"></div>
+    <div><h1>LED Sync</h1><div id="status">Carregando...</div></div>
+    <div class="spacer"></div>
+    <button id="rescan" title="Detectar dispositivos novamente">⟳ Reescanear</button>
+    <button id="quit" title="Encerra o app (os LEDs ficam na última cor)">⏻ Encerrar</button>
+  </header>
+
+  <section>
+    <h2>Efeito (sincronizado em todos)</h2>
+    <div class="effects" id="effects"></div>
+    <div id="preview"></div>
+    <div id="audio" class="audio" hidden>
+      <span>🔊 <span id="audiodev"></span></span>
+      <div class="meter"><div id="audiolvl"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Cor e animação</h2>
+    <div class="row">
+      <div class="field" style="flex:0 0 auto;min-width:0">
+        <label>Cor 1</label><input type="color" id="color">
+      </div>
+      <div class="field" style="flex:0 0 auto;min-width:0" id="color2wrap">
+        <label>Cor 2</label><input type="color" id="color2">
+      </div>
+      <div class="field">
+        <label>Cores rápidas</label>
+        <div class="swatches" id="swatches"></div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <div class="field"><label>Brilho <span id="bv"></span></label><input type="range" id="brightness" min="0" max="100"></div>
+      <div class="field"><label>Velocidade <span id="sv"></span></label><input type="range" id="speed" min="0" max="100"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Dispositivos</h2>
+    <div id="devices"></div>
+  </section>
+</div>
+
+<script>
+const EFFECT_INFO = {
+  static:   ["Estático", "cor fixa"],
+  breathing:["Respiração", "pulsa a cor 1"],
+  spectrum: ["Espectro", "todos mudam juntos"],
+  rainbow:  ["Arco-íris", "onda entre dispositivos"],
+  gradient: ["Gradiente", "onda cor 1 → cor 2"],
+  audio_pulse:   ["♪ Pulso", "cor 1 no volume, cor 2 na batida"],
+  audio_color:   ["♪ Batida", "muda de cor a cada batida"],
+  audio_spectrum:["♪ Equalizador", "grave → agudo em cada peça"],
+  native:   ["Nativo", "fica salvo sem o app"],
+  off:      ["Desligado", "apaga tudo"],
+};
+const SWATCHES = ["#ff0000","#ff6a00","#ffd000","#00ff40","#00ffd0","#00aaff","#0030ff","#8a00ff","#ff00c8","#ffffff"];
+const TYPE_PT = { motherboard:"placa-mãe", dram:"memória", gpu:"placa de vídeo", mouse:"mouse",
+                  keyboard:"teclado", ledstrip:"fita LED", cooler:"cooler", headset:"headset" };
+let state = null, timer = null, pending = {};
+
+const $ = id => document.getElementById(id);
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)
+  });
+  return r.json();
+}
+
+function send(patch, delay = 60) {
+  Object.assign(pending, patch);
+  Object.assign(state.config, patch);
+  renderControls();
+  clearTimeout(timer);
+  timer = setTimeout(async () => { const p = pending; pending = {}; await api("/api/config", p); }, delay);
+}
+
+function renderControls() {
+  const c = state.config;
+  $("effects").innerHTML = "";
+  for (const e of state.effects) {
+    const b = document.createElement("button");
+    b.className = e === c.effect ? "on" : "";
+    b.innerHTML = `${EFFECT_INFO[e][0]}<small>${EFFECT_INFO[e][1]}</small>`;
+    b.onclick = () => send({effect: e}, 0);
+    $("effects").appendChild(b);
+  }
+  if (document.activeElement !== $("color")) $("color").value = c.color;
+  if (document.activeElement !== $("color2")) $("color2").value = c.color2;
+  $("color2wrap").style.visibility = ["gradient", "audio_pulse"].includes(c.effect) ? "visible" : "hidden";
+  $("brightness").value = c.brightness; $("bv").textContent = c.brightness + "%";
+  $("speed").value = c.speed; $("sv").textContent = c.speed + "%";
+  const pv = {
+    static: c.color, breathing: `linear-gradient(90deg, #000, ${c.color}, #000)`,
+    spectrum: "linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)",
+    rainbow: "linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)",
+    gradient: `linear-gradient(90deg, ${c.color}, ${c.color2}, ${c.color})`,
+    native: c.color, off: "#000",
+    audio_pulse: `linear-gradient(90deg, #000, ${c.color}, ${c.color2}, ${c.color}, #000)`,
+    audio_color: "linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f)",
+    audio_spectrum: "linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#a0f)",
+  };
+  $("preview").style.background = pv[c.effect];
+  $("preview").style.opacity = c.effect === "off" ? 1 : Math.max(.15, c.brightness / 100);
+}
+
+function renderDevices() {
+  const box = $("devices");
+  box.innerHTML = "";
+  if (!state.devices.length) { box.innerHTML = `<div style="color:var(--muted)">Nenhum dispositivo ainda.</div>`; return; }
+  for (const d of state.devices) {
+    const el = document.createElement("div");
+    el.className = "dev" + (d.enabled ? "" : " off");
+    el.innerHTML = `<div class="devhead">
+        <label class="switch"><input type="checkbox" ${d.enabled ? "checked" : ""}><span></span></label>
+        <b>${d.name}</b><span class="tag">${TYPE_PT[d.type] || d.type}</span>
+        <span class="tag">${d.leds} LEDs</span></div>`;
+    el.querySelector("input").onchange = ev => {
+      const dis = new Set(state.config.disabled);
+      ev.target.checked ? dis.delete(d.name) : dis.add(d.name);
+      send({disabled: [...dis]}, 0);
+      setTimeout(refresh, 300);
+    };
+    for (const z of d.zones) {
+      if (!z.resizable) continue; // só zonas endereçáveis (ARGB) podem ser redimensionadas
+      z.min = 0; z.max = 120;
+      const zr = document.createElement("div");
+      zr.className = "zone";
+      zr.innerHTML = `↳ ${z.name}: <input type="number" min="${z.min}" max="${z.max}" value="${z.leds}"> LEDs
+        <button>Aplicar</button>${z.leds === 0 ? '<span class="hint">defina quantos LEDs estão ligados aqui (fans/fitas do gabinete)</span>' : ""}`;
+      zr.querySelector("button").onclick = async () => {
+        const v = Math.max(z.min, Math.min(z.max, +zr.querySelector("input").value || 0));
+        await api("/api/resize", {device: d.name, zone: z.name, size: v});
+        setTimeout(refresh, 800);
+      };
+      el.appendChild(zr);
+    }
+    box.appendChild(el);
+  }
+}
+
+function renderAudio() {
+  const a = state.audio;
+  $("audio").hidden = !a;
+  if (!a) return;
+  $("audiodev").textContent = a.error || ("Ouvindo: " + (a.device || "..."));
+  $("audiolvl").style.width = Math.round(a.level * 100) + "%";
+}
+
+// Medidor de volume ao vivo enquanto um modo de som está ativo
+setInterval(async () => {
+  if (!state || !state.audio) return;
+  try { state.audio = (await api("/api/state")).audio; renderAudio(); } catch {}
+}, 150);
+
+async function refresh() {
+  try {
+    state = await api("/api/state");
+  } catch { $("status").textContent = "App encerrado."; $("status").className = ""; return; }
+  $("status").textContent = state.status + (state.devices.length ? ` · ${state.devices.length} dispositivos` : "");
+  $("status").className = state.status === "Conectado" ? "ok" : "";
+  renderControls();
+  renderAudio();
+  if (!document.activeElement || !document.activeElement.closest("#devices")) renderDevices();
+}
+
+$("color").oninput = e => send({color: e.target.value});
+$("color2").oninput = e => send({color2: e.target.value});
+$("brightness").oninput = e => send({brightness: +e.target.value});
+$("speed").oninput = e => send({speed: +e.target.value});
+for (const s of SWATCHES) {
+  const b = document.createElement("button");
+  b.className = "sw"; b.style.background = s; b.title = s;
+  b.onclick = () => send({color: s}, 0);
+  $("swatches").appendChild(b);
+}
+$("rescan").onclick = async () => { await api("/api/rescan", {}); refresh(); };
+$("quit").onclick = async () => { await api("/api/quit", {}); $("status").textContent = "App encerrado."; };
+
+refresh();
+setInterval(() => { if (!Object.keys(pending).length) refresh(); }, 2000);
+</script>
+</body>
+</html>
