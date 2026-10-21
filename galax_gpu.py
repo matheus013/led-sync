@@ -1,5 +1,5 @@
-"""Controle dos LEDs de placas Galax/KFA2 RTX via I2C da GPU (NvAPI).
 # SPDX-License-Identifier: GPL-2.0-or-later
+"""Controle dos LEDs de placas Galax/KFA2 RTX via I2C da GPU (NvAPI).
 
 Protocolo "Galax v2" baseado no OpenRGB (Controllers/GalaxGPUController).
 """

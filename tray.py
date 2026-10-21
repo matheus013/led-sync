@@ -1,5 +1,5 @@
-"""Ícone do LED Sync na bandeja do Windows (perto do relógio)."""
 # SPDX-License-Identifier: GPL-2.0-or-later
+"""Ícone do LED Sync na bandeja do Windows (perto do relógio)."""
 import pystray
 from PIL import Image, ImageDraw
 
