@@ -6,6 +6,13 @@ Controla e sincroniza todos os LEDs RGB do PC a partir de uma única interface, 
 - Placa-mãe ASUS ROG STRIX B550-A (Aura + conector ARGB do gabinete)
 - Memória HyperX Predator RGB
 - Mouse Logitech G703 LIGHTSPEED
+- Placa de vídeo GALAX RTX 4070 Ti EX Gamer White V2 (controle direto via I2C da GPU, `galax_gpu.py`)
+
+## Placa de vídeo Galax
+O OpenRGB não reconhece a 4070 Ti EX Gamer White V2. O `galax_gpu.py` usa o mesmo protocolo
+"Galax v2" do OpenRGB (registradores de cor `0x02-0x04`, modo `0x30`, sync `0x27`, salvar `0x40`)
+via NvAPI I2C no endereço `0x50`; esta placa responde com a assinatura `02 01`.
+Diagnóstico somente leitura: `python galax_gpu.py probe`.
 
 ## Efeitos
 | Efeito | Descrição |

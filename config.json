@@ -1,7 +1,7 @@
 {
   "effect": "audio_pulse",
-  "color": "#fb00ff",
-  "color2": "#ffffff",
+  "color": "#ffffff",
+  "color2": "#86099f",
   "brightness": 100,
   "speed": 10,
   "disabled": [

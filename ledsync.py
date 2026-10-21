@@ -14,6 +14,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from openrgb import OpenRGBClient
 from openrgb.utils import DeviceType, RGBColor
 
+import galax_gpu
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(HERE, "config.json")
 INDEX_PATH = os.path.join(HERE, "index.html")
@@ -155,6 +157,7 @@ class Engine:
         self.lock = threading.RLock()
         self.cfg = load_config()
         self.client = None
+        self.extras = None  # dispositivos controlados fora do OpenRGB (ex.: GPU Galax via I2C)
         self.status = "Conectando ao OpenRGB..."
         self.needs_setup = True
         self.last_sent = {}
@@ -187,6 +190,8 @@ class Engine:
             if len(self.client.devices) != count:
                 count, stable_since = len(self.client.devices), time.time()
             time.sleep(1)
+        if self.extras is None:
+            self.extras = galax_gpu.detect_devices()
         self.status = "Conectado"
         self.needs_setup = True
         return True
@@ -221,9 +226,14 @@ class Engine:
         if "static" in names:
             dev.set_mode("static")
         dev.set_color(color)
+        if hasattr(dev, "save_hardware"):
+            dev.save_hardware()
+
+    def all_devices(self):
+        return list(self.client.devices) + list(self.extras or [])
 
     def enabled_devices(self):
-        return [d for d in self.client.devices if d.name not in self.cfg["disabled"]]
+        return [d for d in self.all_devices() if d.name not in self.cfg["disabled"]]
 
     # ---------- efeitos ----------
     def scaled(self, rgb):
@@ -318,7 +328,7 @@ class Engine:
         with self.lock:
             devices = []
             if self.client:
-                for d in self.client.devices:
+                for d in self.all_devices():
                     devices.append({
                         "name": d.name,
                         "type": DeviceType(d.type).name.lower(),
