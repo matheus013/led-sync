@@ -34,6 +34,7 @@ Instala o OpenRGB e as dependências Python, e cria os atalhos na Área de Traba
 
 ## Uso
 - Abra pelo atalho **LED Sync**: a interface fica em `http://127.0.0.1:7777`.
+- Ícone na bandeja (perto do relógio): clique para abrir o painel; botão direito para efeito, cor, brilho, dispositivos, ligar/desligar e encerrar.
 - Fechar a janela não para os LEDs; use **Encerrar** para parar o app.
 - Em "Addressable RGB Header", informe quantos LEDs estão ligados no conector ARGB.
 - `config.json` guarda efeito, cores, brilho e tamanhos das zonas.

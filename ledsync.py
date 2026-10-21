@@ -381,6 +381,7 @@ class Engine:
 
 
 engine = Engine()
+tray_icon = None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -423,8 +424,9 @@ class Handler(BaseHTTPRequestHandler):
             engine.rescan()
         elif self.path == "/api/quit":
             self.send_json({"ok": True})
-            engine.running = False
-            threading.Thread(target=server.shutdown, daemon=True).start()
+            if tray_icon:
+                tray_icon.stop()
+            shutdown()
             return
         else:
             return self.send_json({"error": "not found"}, 404)
@@ -441,6 +443,11 @@ def open_window():
     webbrowser.open(url)
 
 
+def shutdown():
+    engine.running = False
+    threading.Thread(target=server.shutdown, daemon=True).start()
+
+
 def already_running():
     with socket.socket() as s:
         return s.connect_ex(("127.0.0.1", PORT)) == 0
@@ -454,6 +461,14 @@ if __name__ == "__main__":
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     threading.Thread(target=engine.run, daemon=True).start()
     threading.Thread(target=engine.audio.run, daemon=True).start()
+    threading.Thread(target=server.serve_forever, daemon=True).start()
     if not headless:
         threading.Timer(0.5, open_window).start()
-    server.serve_forever()
+    try:
+        import tray
+        tray_icon = tray.build_tray(engine, open_window, shutdown)
+        tray_icon.run()  # bloqueia até "Encerrar"
+    except ImportError:
+        # Sem pystray: segue rodando só com a interface web
+        while engine.running:
+            time.sleep(1)

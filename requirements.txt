@@ -1,3 +1,5 @@
 openrgb-python>=0.3.8
 soundcard
 numpy
+pystray
+pillow
