@@ -64,6 +64,13 @@
   .audio[hidden] { display: none; }
   .meter { flex: 1; height: 6px; background: var(--panel2); border-radius: 99px; overflow: hidden; }
   .meter div { height: 100%; width: 0; background: linear-gradient(90deg, #3ddc84, #ffd000, #ff3b3b); transition: width .08s; }
+  .outputs { margin-top: 12px; }
+  .outputs[hidden] { display: none; }
+  .outputs-title { color: var(--muted); font-size: 12.5px; margin-bottom: 8px; }
+  .outputs-title small { opacity: .75; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 12.5px; padding: 6px 10px; border-radius: 99px; }
+  .chip.on { border-color: var(--accent); background: #12303f; }
   @media (max-width: 560px) { .field { min-width: 100%; } }
 </style>
 </head>
@@ -84,6 +91,10 @@
     <div id="audio" class="audio" hidden>
       <span>🔊 <span id="audiodev"></span></span>
       <div class="meter"><div id="audiolvl"></div></div>
+    </div>
+    <div id="outputs" class="outputs" hidden>
+      <div class="outputs-title">Ouvir a saída de áudio <small>(marque mais de uma para somar, ex.: Voice + Game)</small></div>
+      <div id="outputlist" class="chips"></div>
     </div>
   </section>
 
@@ -144,6 +155,7 @@ function send(patch, delay = 60) {
   Object.assign(pending, patch);
   Object.assign(state.config, patch);
   renderControls();
+  renderOutputs();
   clearTimeout(timer);
   timer = setTimeout(async () => { const p = pending; pending = {}; await api("/api/config", p); }, delay);
 }
@@ -212,6 +224,38 @@ function renderDevices() {
   }
 }
 
+function shortName(n) {
+  // "Fones de ouvido (Astro A50 Game)" -> "Astro A50 Game"
+  const m = n.match(/\(([^)]+)\)\s*$/);
+  return m ? m[1] : n;
+}
+
+function renderOutputs() {
+  const show = state.effects && state.config.effect.startsWith("audio_");
+  $("outputs").hidden = !show;
+  if (!show) return;
+  const sel = state.config.audio_devices || [];
+  const outs = state.audio_outputs || [];
+  const def = outs.find(o => o.default);
+  const box = $("outputlist");
+  box.innerHTML = "";
+  const chip = (label, on, onclick, title) => {
+    const b = document.createElement("button");
+    b.className = "chip" + (on ? " on" : "");
+    b.textContent = label; b.title = title || label; b.onclick = onclick;
+    box.appendChild(b);
+  };
+  chip("Padrão do Windows" + (def ? ` (${shortName(def.name)})` : ""), !sel.length,
+       () => send({audio_devices: []}, 0));
+  for (const o of outs) {
+    const on = sel.includes(o.id);
+    chip(shortName(o.name), on, () => {
+      const next = on ? sel.filter(id => id !== o.id) : [...sel, o.id];
+      send({audio_devices: next}, 0);
+    }, o.name);
+  }
+}
+
 function renderAudio() {
   const a = state.audio;
   $("audio").hidden = !a;
@@ -234,6 +278,7 @@ async function refresh() {
   $("status").className = state.status === "Conectado" ? "ok" : "";
   renderControls();
   renderAudio();
+  renderOutputs();
   if (!document.activeElement || !document.activeElement.closest("#devices")) renderDevices();
 }
 

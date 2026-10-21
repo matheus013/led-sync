@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """LED Sync - controla e sincroniza todos os LEDs RGB via servidor SDK do OpenRGB."""
 import colorsys
+import contextlib
 import json
 import math
 import os
@@ -42,6 +43,7 @@ DEFAULTS = {
     "speed": 40,
     "disabled": [],
     "zone_sizes": {},
+    "audio_devices": [],  # IDs das saídas de áudio ouvidas; vazio = saída padrão do Windows
 }
 
 
@@ -87,26 +89,45 @@ class AudioMeter:
         self.bands = [0.0] * AUDIO_BANDS
         self.beat = 0.0
         self.beat_count = 0
+        self.selected = []  # IDs escolhidos; vazio = padrão do Windows
+        self.outputs = []   # saídas disponíveis, atualizadas por esta thread
+
+    def refresh_outputs(self, sc):
+        default_id = sc.default_speaker().id
+        self.outputs = [{"id": sp.id, "name": sp.name, "default": sp.id == default_id}
+                        for sp in sc.all_speakers()]
 
     def run(self):
+        import soundcard as sc  # importado nesta thread por causa da inicialização COM
+        last_refresh = 0
         while True:
             if not self.active:
                 self.level, self.bands, self.beat = 0.0, [0.0] * AUDIO_BANDS, 0.0
+                if time.time() - last_refresh > 5:
+                    try:
+                        self.refresh_outputs(sc)
+                    except Exception:
+                        pass
+                    last_refresh = time.time()
                 time.sleep(0.3)
                 continue
             try:
-                self.capture()
+                self.capture(sc)
             except Exception as e:
                 self.error = f"Erro no áudio: {e}"
                 time.sleep(2)
 
-    def capture(self):
+    def capture(self, sc):
         import numpy as np
-        import soundcard as sc  # importado nesta thread por causa da inicialização COM
 
-        speaker = sc.default_speaker()
-        mic = sc.get_microphone(id=str(speaker.name), include_loopback=True)
-        self.device, self.error = speaker.name, None
+        self.refresh_outputs(sc)
+        selected = list(self.selected)
+        speakers = [sp for sp in sc.all_speakers() if sp.id in selected]
+        if not speakers:
+            speakers = [sc.default_speaker()]
+        default_id = sc.default_speaker().id
+        mics = [sc.get_microphone(id=sp.id, include_loopback=True) for sp in speakers]
+        self.device, self.error = " + ".join(sp.name for sp in speakers), None
 
         freqs = np.fft.rfftfreq(AUDIO_BLOCK, 1 / AUDIO_RATE)
         edges = np.geomspace(40, 16000, AUDIO_BANDS + 1)
@@ -118,10 +139,14 @@ class AudioMeter:
         bass_avg = 0.0
         last_check = time.time()
 
-        with mic.recorder(samplerate=AUDIO_RATE, blocksize=AUDIO_BLOCK) as rec:
+        with contextlib.ExitStack() as stack:
+            recs = [stack.enter_context(m.recorder(samplerate=AUDIO_RATE, blocksize=AUDIO_BLOCK)) for m in mics]
             while self.active:
-                data = rec.record(numframes=AUDIO_BLOCK)
-                mono = data.mean(axis=1) if data.ndim > 1 else data
+                # Com mais de uma saída escolhida (ex.: Voice + Game), soma o áudio de todas
+                mono = np.zeros(AUDIO_BLOCK)
+                for rec in recs:
+                    data = rec.record(numframes=AUDIO_BLOCK)
+                    mono += data.mean(axis=1) if data.ndim > 1 else data
                 rms = float(np.sqrt(np.mean(mono ** 2)))
                 spec = np.abs(np.fft.rfft(mono * window))
                 energy = np.array([spec[i].mean() if len(i) else 0.0 for i in band_idx])
@@ -146,10 +171,13 @@ class AudioMeter:
                     self.beat *= 0.86
                 bass_avg = bass_avg * 0.95 + bass * 0.05
 
-                # Se a saída padrão do Windows mudar (ex.: fone → caixa), reabre a captura
+                # Reabre a captura se a escolha mudar ou, no modo padrão, se o Windows trocar a saída
                 if time.time() - last_check > 3:
                     last_check = time.time()
-                    if sc.default_speaker().name != speaker.name:
+                    self.refresh_outputs(sc)
+                    if self.selected != selected:
+                        return
+                    if not selected and sc.default_speaker().id != default_id:
                         return
 
 
@@ -165,6 +193,7 @@ class Engine:
         self.running = True
         self.audio = AudioMeter()
         self.audio.active = self.cfg["effect"] in AUDIO_EFFECTS
+        self.audio.selected = list(self.cfg["audio_devices"])
 
     # ---------- conexão ----------
     def connect(self):
@@ -346,18 +375,19 @@ class Engine:
                 audio = {"device": self.audio.device, "error": self.audio.error,
                          "level": round(self.audio.level, 3)}
             return {"status": self.status, "config": self.cfg, "devices": devices,
-                    "effects": EFFECTS, "audio": audio}
+                    "effects": EFFECTS, "audio": audio, "audio_outputs": self.audio.outputs}
 
     def update_config(self, patch):
         with self.lock:
             prev_effect = self.cfg["effect"]
             prev_disabled = list(self.cfg["disabled"])
-            for k in ("effect", "color", "color2", "brightness", "speed", "disabled"):
+            for k in ("effect", "color", "color2", "brightness", "speed", "disabled", "audio_devices"):
                 if k in patch:
                     self.cfg[k] = patch[k]
             if self.cfg["effect"] not in EFFECTS:
                 self.cfg["effect"] = "rainbow"
             self.audio.active = self.cfg["effect"] in AUDIO_EFFECTS
+            self.audio.selected = list(self.cfg["audio_devices"])
             mode_changed = (prev_effect == "native") != (self.cfg["effect"] == "native")
             if mode_changed or prev_disabled != self.cfg["disabled"]:
                 self.needs_setup = True

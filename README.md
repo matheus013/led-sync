@@ -24,7 +24,8 @@ Diagnóstico somente leitura: `python galax_gpu.py probe`.
 | ♪ Equalizador | espectro grave → agudo em cada peça |
 | Nativo | grava a cor no hardware (funciona com o app fechado) |
 
-Os modos ♪ capturam o áudio que sai pela saída padrão do Windows (loopback WASAPI).
+Os modos ♪ capturam o áudio que sai do PC (loopback WASAPI). Por padrão ouvem a saída padrão do Windows;
+no painel ou na bandeja dá para escolher outras saídas — marcando mais de uma (ex.: Astro A50 Voice + Game) o áudio é somado.
 
 ## Instalação
 ```powershell

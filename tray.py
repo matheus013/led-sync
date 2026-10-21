@@ -88,6 +88,30 @@ def build_tray(engine, open_window, shutdown):
             return [pystray.MenuItem("Detectando...", None, enabled=False)]
         return [device_item(n) for n in names]
 
+    def short_name(name):
+        # "Fones de ouvido (Astro A50 Game)" -> "Astro A50 Game"
+        return name[name.rfind("(") + 1:-1] if name.endswith(")") and "(" in name else name
+
+    def output_item(out):
+        def toggle():
+            selected = list(engine.cfg["audio_devices"])
+            if out["id"] in selected:
+                selected.remove(out["id"])
+            else:
+                selected.append(out["id"])
+            set_cfg({"audio_devices": selected})
+        return pystray.MenuItem(short_name(out["name"]), toggle,
+                                checked=lambda item: out["id"] in engine.cfg["audio_devices"])
+
+    def outputs_menu():
+        outs = list(engine.audio.outputs)
+        default = next((o for o in outs if o["default"]), None)
+        label = "Padrão do Windows" + (f" ({short_name(default['name'])})" if default else "")
+        items = [pystray.MenuItem(label, lambda: set_cfg({"audio_devices": []}),
+                                  checked=lambda item: not engine.cfg["audio_devices"], radio=True),
+                 pystray.Menu.SEPARATOR]
+        return items + [output_item(o) for o in outs]
+
     def quit_app():
         icon.stop()
         shutdown()
@@ -103,6 +127,7 @@ def build_tray(engine, open_window, shutdown):
         pystray.MenuItem("Cor", pystray.Menu(*[color_item(n, v) for n, v in COLORS])),
         pystray.MenuItem("Brilho", pystray.Menu(*[brightness_item(v) for v in BRIGHTNESS])),
         pystray.MenuItem("Dispositivos", pystray.Menu(lambda: devices_menu())),
+        pystray.MenuItem("Saída de áudio (modos ♪)", pystray.Menu(lambda: outputs_menu())),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Encerrar LED Sync", quit_app),
     )
